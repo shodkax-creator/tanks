@@ -14,7 +14,7 @@ import { TOTAL_STAGES, getStageDef } from './game/levels.ts';
 import { createGameState, stepGameState } from './game/simulation.ts';
 import { TankRenderer } from './game/renderer.ts';
 import { soundEngine } from './game/sound.ts';
-import { MultiplayerClient } from './game/netClient.ts';
+import { MultiplayerClient, TransportMode } from './game/netClient.ts';
 import { TitleScreen } from './components/TitleScreen.tsx';
 import { StageSelectModal } from './components/StageSelectModal.tsx';
 import { MultiplayerLobby } from './components/MultiplayerLobby.tsx';
@@ -130,6 +130,7 @@ export default function App() {
 
   // Multiplayer Lobby React state
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [transport, setTransport] = useState<TransportMode>('detecting');
   const [rttMs, setRttMs] = useState<number>(0);
   const [roomsList, setRoomsList] = useState<RoomSummary[]>([]);
   const [roomState, setRoomState] = useState<RoomStatePayload | null>(null);
@@ -169,10 +170,13 @@ export default function App() {
     });
   }, []);
 
-  // Initialize Multiplayer WebSocket Client once
+  // Initialize Multiplayer WebSocket / WebRTC P2P Client once
   useEffect(() => {
     const client = new MultiplayerClient({
-      onConnectionChange: (conn) => setWsConnected(conn),
+      onConnectionChange: (conn, modeTransport) => {
+        setWsConnected(conn);
+        setTransport(modeTransport);
+      },
       onRoomsList: (list) => setRoomsList(list),
       onRoomJoined: (playerId, _slot, room) => {
         setMyPlayerId(playerId);
@@ -715,10 +719,11 @@ export default function App() {
         />
       )}
 
-      {/* Real WebSocket Multiplayer Lobby Modal */}
+      {/* Real WebSocket / Serverless P2P Multiplayer Lobby Modal */}
       {mpLobbyOpen && (
         <MultiplayerLobby
           connected={wsConnected}
+          transport={transport}
           rttMs={rttMs}
           room={roomState}
           playerId={myPlayerId}

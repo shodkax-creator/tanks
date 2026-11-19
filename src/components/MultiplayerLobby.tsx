@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Check, Copy, Play, RefreshCw, ShieldAlert, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { RoomStatePayload, RoomSummary } from '../game/types.ts';
+import { TransportMode } from '../game/netClient.ts';
 import { TOTAL_STAGES, getStageDef } from '../game/levels.ts';
 
 interface MultiplayerLobbyProps {
   connected: boolean;
+  transport: TransportMode;
   rttMs: number;
   room: RoomStatePayload | null;
   playerId: string | null;
@@ -23,6 +25,7 @@ interface MultiplayerLobbyProps {
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   connected,
+  transport,
   rttMs,
   room,
   playerId,
@@ -90,7 +93,11 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                 ) : (
                   <WifiOff className="w-3.5 h-3.5 text-red-400" />
                 )}
-                {connected ? 'Сервер подключён' : 'Подключение...'}
+                {connected
+                  ? transport === 'p2p'
+                    ? 'P2P WebRTC готов (без сервера)'
+                    : 'Сервер подключён'
+                  : 'Подключение...'}
               </span>
               {connected && rttMs > 0 && (
                 <>
@@ -220,51 +227,57 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                 </div>
               </div>
 
-              {/* Open Public Rooms */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                    Открытые комнаты
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onRefreshRooms}
-                    className="min-h-[36px] px-2.5 text-xs text-zinc-300 hover:text-amber-400 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Обновить
-                  </button>
+              {/* Open Public Rooms (WS mode) or Direct P2P Invite Hint (Vercel Free mode) */}
+              {transport === 'p2p' ? (
+                <div className="px-4 py-3.5 bg-[#0f1218] border border-zinc-800 text-xs text-zinc-400 leading-relaxed">
+                  Прямое P2P-соединение WebRTC работает бесплатно без игрового сервера. Создайте комнату и отправьте другу 4-значный код или ссылку-приглашение — пинг минимальный за счёт прямого канала и клиентского предсказания.
                 </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      Открытые комнаты
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onRefreshRooms}
+                      className="min-h-[36px] px-2.5 text-xs text-zinc-300 hover:text-amber-400 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Обновить
+                    </button>
+                  </div>
 
-                {roomsList.length === 0 ? (
-                  <div className="px-4 py-5 bg-[#0f1218] border border-zinc-800 text-center text-sm text-zinc-500">
-                    Пока нет активных комнат — создайте свою и отправьте код другу
-                  </div>
-                ) : (
-                  <div className="flex flex-col divide-y divide-zinc-800 border border-zinc-800 bg-[#0f1218]">
-                    {roomsList.map((r) => (
-                      <div key={r.code} className="flex items-center justify-between px-4 py-3 gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="font-mono-num font-bold text-amber-400 tracking-wider">
-                            {r.code}
-                          </span>
-                          <span className="text-xs text-zinc-400 truncate">
-                            Уровень {r.stage} · {r.players}/{r.maxPlayers} игроков
-                          </span>
+                  {roomsList.length === 0 ? (
+                    <div className="px-4 py-5 bg-[#0f1218] border border-zinc-800 text-center text-sm text-zinc-500">
+                      Пока нет активных комнат — создайте свою и отправьте код другу
+                    </div>
+                  ) : (
+                    <div className="flex flex-col divide-y divide-zinc-800 border border-zinc-800 bg-[#0f1218]">
+                      {roomsList.map((r) => (
+                        <div key={r.code} className="flex items-center justify-between px-4 py-3 gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="font-mono-num font-bold text-amber-400 tracking-wider">
+                              {r.code}
+                            </span>
+                            <span className="text-xs text-zinc-400 truncate">
+                              Уровень {r.stage} · {r.players}/{r.maxPlayers} игроков
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={r.players >= r.maxPlayers || r.status === 'playing'}
+                            onClick={() => onJoinRoom(r.code, playerName.trim() || 'Игрок 2')}
+                            className="min-h-[38px] px-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-xs font-semibold uppercase tracking-wider cursor-pointer whitespace-nowrap"
+                          >
+                            {r.status === 'playing' ? 'В бою' : r.players >= 2 ? 'Полно' : 'Войти'}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          disabled={r.players >= r.maxPlayers || r.status === 'playing'}
-                          onClick={() => onJoinRoom(r.code, playerName.trim() || 'Игрок 2')}
-                          className="min-h-[38px] px-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-xs font-semibold uppercase tracking-wider cursor-pointer whitespace-nowrap"
-                        >
-                          {r.status === 'playing' ? 'В бою' : r.players >= 2 ? 'Полно' : 'Войти'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             /* Inside Active Room Lobby */

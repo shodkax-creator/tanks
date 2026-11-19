@@ -257,6 +257,10 @@ async function bootstrap(): Promise<void> {
   const app = express();
   app.use(express.json());
 
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, ws: true });
+  });
+
   app.get('/api/rooms', (_req, res) => {
     res.json({ rooms: getRoomsSummary() });
   });

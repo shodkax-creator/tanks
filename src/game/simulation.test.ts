@@ -170,3 +170,50 @@ test('client-side prediction & server reconciliation converges with zero drift u
     `Predicted (${clientP1.x}, ${clientP1.y}) must match authoritative (${serverP1.x}, ${serverP1.y})`
   );
 });
+
+test('P2PRoomHost (Vercel serverless multiplayer) syncs 2 players and reconciles guest prediction', async () => {
+  const { P2PRoomHost } = await import('./p2pHost.ts');
+  const guestReceived: import('./types.ts').ServerWsMessage[] = [];
+  let hostStartedState: import('./types.ts').GameState | null = null;
+
+  const host = new P2PRoomHost('VRC1', 'Хост', 1, false, {
+    onHostRoomUpdated: () => {},
+    onHostGameStarted: (st) => {
+      hostStartedState = st;
+    },
+    onHostEvents: () => {},
+  });
+
+  const attached = host.attachGuest('Гость', {
+    send: (m) => guestReceived.push(m),
+  });
+  assert.equal(attached, true);
+  assert.equal(host.getRoomPayload().players.length, 2);
+
+  host.startMatch(1, false);
+  assert.ok(hostStartedState !== null);
+  assert.equal(host.state?.players.length, 2);
+
+  // Guest predicts 4 UP steps locally while sending them to Host
+  const guestLocal = cloneGameState(host.state!);
+  const pending: PlayerInput[] = [];
+  for (let seq = 1; seq <= 4; seq++) {
+    const inp: PlayerInput = { seq, dir: Direction.UP, fire: false };
+    pending.push(inp);
+    stepPlayerInput(guestLocal, 'p2', inp, FIXED_DT, true);
+    host.queueGuestInput(inp);
+  }
+
+  // Host advances 2 ticks (processes guest seq 1..2 and broadcasts snapshot)
+  host.setHostInput(Direction.UP, false);
+  host.stepTick();
+  host.stepTick();
+
+  const snapMsg = [...guestReceived].reverse().find((m) => m.type === 'snapshot');
+  assert.ok(snapMsg && snapMsg.type === 'snapshot', 'Host must emit snapshot to guest');
+
+  const rec = reconcileClientState(guestLocal, snapMsg.state, 'p2', pending);
+  assert.equal(rec.remainingInputs.length, 2, 'Guest retains unacked seq 3..4');
+  assert.ok(Math.abs(rec.errorY) < 0.001, 'P2P guest reconciliation has zero drift');
+});
+
