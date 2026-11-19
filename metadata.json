@@ -1,0 +1,6 @@
+{
+  "name": "Танки 1990 — Battle City Online",
+  "description": "Кроссплатформенная аркадная игра в духе Battle City / Tanks 1990 со всеми 35 уровнями, мобильным и ПК управлением и онлайн-мультиплеером с клиентским предсказанием.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
